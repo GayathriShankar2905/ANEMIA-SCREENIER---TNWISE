@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "831637528472",
+    "project_id": "hemoscan-a-93b02",
+    "storage_bucket": "hemoscan-a-93b02.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:831637528472:android:83402e05ea0b2f8ac755ed",
+        "android_client_info": {
+          "package_name": "com.example.anemia_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAf4sIkng-55IabE90WLea9t0BO0dT3-4Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
