@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # anemia_app
 
 A new Flutter project.
@@ -14,3 +15,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# ANEMIA-SCREENIER---TNWISE
+>>>>>>> c9273a9d1c07e974dc797c56c0c593c759c42370
