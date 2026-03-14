@@ -98,31 +98,53 @@ class ColorAnalysis {
     return results;
   }
 
+  // ════════════════════════════════════════════════════════
+  //  SCORING ENGINE  (total 135 pts max)
+  //
+  //  👁️  Conjunctiva   35 pts  ← most clinically reliable
+  //  💅  Nail beds     30 pts
+  //  🫁  SpO₂          25 pts
+  //  🤚  Palm          25 pts
+  //  ❤️  Heart rate    20 pts
+  //
+  //  Conjunctiva threshold (Sheth et al. 2016):
+  //    R/(R+G+B) ≥ 0.43  → healthy       (0 pts)
+  //    0.38–0.43          → mild pallor   (12 pts)
+  //    0.32–0.38          → moderate      (24 pts)
+  //    < 0.32             → severe        (35 pts)
+  // ════════════════════════════════════════════════════════
   static ScanResult score({
-    double? hr, double? spo2,
-    List<ROIResult>? nailData, List<ROIResult>? palmData,
+    double? hr,
+    double? spo2,
+    List<ROIResult>? nailData,
+    List<ROIResult>? palmData,
+    List<ROIResult>? conjunctivaData,
   }) {
     int score = 0, maxScore = 0;
     final bd = <String, SignalBreakdown>{};
 
-    if (hr != null) {
-      maxScore += 20;
-      final pts = hr > 110 ? 20 : hr > 100 ? 13 : hr > 90 ? 5 : 0;
+    // ── 1. Conjunctiva (highest weight) ───────────────────
+    if (conjunctivaData != null && conjunctivaData.isNotEmpty) {
+      maxScore += 35;
+      // redness field = R/(R+G+B) ratio stored by ConjunctivaCaptureScreen
+      final ar = conjunctivaData.map((r) => r.redness).reduce((a,b) => a+b)
+                 / conjunctivaData.length;
+      final pts = ar < 0.32 ? 35
+                : ar < 0.38 ? 24
+                : ar < 0.43 ? 12
+                : 0;
       score += pts;
-      bd['hr'] = SignalBreakdown(points: pts, max: 20, icon: '❤️',
-        label: hr > 110 ? 'Significant tachycardia'
-             : hr > 100 ? 'Mild tachycardia'
-             : hr > 90  ? 'High-normal HR' : 'Normal HR');
+      bd['conjunctiva'] = SignalBreakdown(
+        points: pts, max: 35, icon: '👁️',
+        redness: ar,
+        label: ar < 0.32 ? 'Severe conjunctival pallor'
+             : ar < 0.38 ? 'Moderate conjunctival pallor'
+             : ar < 0.43 ? 'Mild conjunctival pallor'
+             : 'Normal conjunctival redness',
+      );
     }
-    if (spo2 != null) {
-      maxScore += 25;
-      final pts = spo2 < 90 ? 25 : spo2 < 94 ? 18 : spo2 < 96 ? 8 : 0;
-      score += pts;
-      bd['spo2'] = SignalBreakdown(points: pts, max: 25, icon: '🫁',
-        label: spo2 < 90 ? 'Very low SpO₂'
-             : spo2 < 94 ? 'Low SpO₂'
-             : spo2 < 96 ? 'Borderline SpO₂' : 'Normal SpO₂');
-    }
+
+    // ── 2. Nail beds ──────────────────────────────────────
     if (nailData != null && nailData.isNotEmpty) {
       maxScore += 30;
       final ap = nailData.map((r)=>r.pallor ).reduce((a,b)=>a+b) / nailData.length;
@@ -133,6 +155,19 @@ class ColorAnalysis {
         pallor: ap, redness: ar,
         label: ap > 0.55 ? 'Pale nail beds' : 'Normal nail bed color');
     }
+
+    // ── 3. SpO₂ ───────────────────────────────────────────
+    if (spo2 != null) {
+      maxScore += 25;
+      final pts = spo2 < 90 ? 25 : spo2 < 94 ? 18 : spo2 < 96 ? 8 : 0;
+      score += pts;
+      bd['spo2'] = SignalBreakdown(points: pts, max: 25, icon: '🫁',
+        label: spo2 < 90 ? 'Very low SpO₂'
+             : spo2 < 94 ? 'Low SpO₂'
+             : spo2 < 96 ? 'Borderline SpO₂' : 'Normal SpO₂');
+    }
+
+    // ── 4. Palm ───────────────────────────────────────────
     if (palmData != null && palmData.isNotEmpty) {
       maxScore += 25;
       final ap = palmData.map((r)=>r.pallor ).reduce((a,b)=>a+b) / palmData.length;
@@ -144,15 +179,29 @@ class ColorAnalysis {
         label: ap > 0.55 ? 'Pale palm lines' : 'Normal palm color');
     }
 
+    // ── 5. Heart rate ─────────────────────────────────────
+    if (hr != null) {
+      maxScore += 20;
+      final pts = hr > 110 ? 20 : hr > 100 ? 13 : hr > 90 ? 5 : 0;
+      score += pts;
+      bd['hr'] = SignalBreakdown(points: pts, max: 20, icon: '❤️',
+        label: hr > 110 ? 'Significant tachycardia'
+             : hr > 100 ? 'Mild tachycardia'
+             : hr > 90  ? 'High-normal HR' : 'Normal HR');
+    }
+
     final pct = maxScore > 0 ? (score / maxScore) * 100.0 : 0.0;
-    final hgb = (16.0 - (pct/100)*11).clamp(5.0, 17.0);
+    final hgb = (16.0 - (pct / 100) * 11).clamp(5.0, 17.0);
+
     Color rc; String rl;
-    if (pct >= 65)      { rc = const Color(0xFFEF4444); rl = 'HIGH RISK'; }
+    if (pct >= 65)      { rc = const Color(0xFFFF4D6A); rl = 'HIGH RISK'; }
     else if (pct >= 40) { rc = const Color(0xFFF97316); rl = 'MODERATE RISK'; }
-    else if (pct >= 20) { rc = const Color(0xFFEAB308); rl = 'MILD RISK'; }
-    else                { rc = const Color(0xFF0D9488); rl = 'LOW RISK'; }
-    return ScanResult(riskPct: pct, estHgb: hgb,
-        riskLevel: rl, riskColor: rc, breakdown: bd);
+    else if (pct >= 20) { rc = const Color(0xFFFFB547); rl = 'MILD RISK'; }
+    else                { rc = const Color(0xFF00D4C8); rl = 'LOW RISK'; }
+
+    return ScanResult(
+      riskPct: pct, estHgb: hgb,
+      riskLevel: rl, riskColor: rc, breakdown: bd);
   }
 }
 
@@ -166,12 +215,14 @@ class ScanProvider extends ChangeNotifier {
 
   List<ROIResult>? nailData;
   List<ROIResult>? palmData;
+  List<ROIResult>? conjunctivaData;
   ScanResult?      result;
 
   WebSocketChannel?   _channel;
   StreamSubscription? _sub;
 
-  bool get canAnalyze   => hr != null || spo2 != null || nailData != null || palmData != null;
+  bool get canAnalyze => hr != null || spo2 != null ||
+      nailData != null || palmData != null || conjunctivaData != null;
   bool get hrAbnormal   => hr   != null && hr!   > 100;
   bool get spo2Abnormal => spo2 != null && spo2! < 95;
 
@@ -207,17 +258,30 @@ class ScanProvider extends ChangeNotifier {
     _channel = null; _sub = null;
   }
 
-  void setManualHR(double? v)          { hr       = v; notifyListeners(); }
-  void setManualSpo2(double? v)        { spo2     = v; notifyListeners(); }
-  void setNailData(List<ROIResult>? d) { nailData = d; notifyListeners(); }
-  void setPalmData(List<ROIResult>? d) { palmData = d; notifyListeners(); }
+  void setManualHR(double? v)                  { hr               = v; notifyListeners(); }
+  void setManualSpo2(double? v)                { spo2             = v; notifyListeners(); }
+  void setNailData(List<ROIResult>? d)         { nailData         = d; notifyListeners(); }
+  void setPalmData(List<ROIResult>? d)         { palmData         = d; notifyListeners(); }
+  void setConjunctivaData(List<ROIResult>? d)  { conjunctivaData  = d; notifyListeners(); }
 
   void analyze() {
-    result = ColorAnalysis.score(hr: hr, spo2: spo2, nailData: nailData, palmData: palmData);
+    result = ColorAnalysis.score(
+      hr:               hr,
+      spo2:             spo2,
+      nailData:         nailData,
+      palmData:         palmData,
+      conjunctivaData:  conjunctivaData,
+    );
     notifyListeners();
   }
 
-  void reset() { nailData = null; palmData = null; result = null; notifyListeners(); }
+  void reset() {
+    nailData        = null;
+    palmData        = null;
+    conjunctivaData = null;
+    result          = null;
+    notifyListeners();
+  }
 
   @override
   void dispose() { _disconnect(); super.dispose(); }
