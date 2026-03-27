@@ -99,19 +99,16 @@ class ColorAnalysis {
   }
 
   // ════════════════════════════════════════════════════════
-  //  SCORING ENGINE  (total 135 pts max)
+  //  SCORING ENGINE  (total 155 pts max)
   //
-  //  👁️  Conjunctiva   35 pts  ← most clinically reliable
-  //  💅  Nail beds     30 pts
-  //  🫁  SpO₂          25 pts
-  //  🤚  Palm          25 pts
-  //  ❤️  Heart rate    20 pts
-  //
-  //  Conjunctiva threshold (Sheth et al. 2016):
-  //    R/(R+G+B) ≥ 0.43  → healthy       (0 pts)
-  //    0.38–0.43          → mild pallor   (12 pts)
-  //    0.32–0.38          → moderate      (24 pts)
-  //    < 0.32             → severe        (35 pts)
+  //  Signal              Max pts   Notes
+  //  ─────────────────────────────────────────────────────
+  //  Conjunctiva          35 pts   Sheth et al. 2016
+  //  Nail beds            30 pts   Chrominance index
+  //  Symptom questionnaire 20 pts  10-Q clinical screen
+  //  SpO₂                 25 pts   Physiological
+  //  Palm                 25 pts   Palmar pallor
+  //  Heart rate           20 pts   Compensatory tachycardia
   // ════════════════════════════════════════════════════════
   static ScanResult score({
     double? hr,
@@ -119,29 +116,26 @@ class ColorAnalysis {
     List<ROIResult>? nailData,
     List<ROIResult>? palmData,
     List<ROIResult>? conjunctivaData,
+    int? symptomScore,      // raw score from questionnaire
+    int? symptomMax,        // max possible (30 from questionnaire)
   }) {
     int score = 0, maxScore = 0;
     final bd = <String, SignalBreakdown>{};
 
-    // ── 1. Conjunctiva (highest weight) ───────────────────
+    // ── 1. Conjunctiva ────────────────────────────────────
     if (conjunctivaData != null && conjunctivaData.isNotEmpty) {
       maxScore += 35;
-      // redness field = R/(R+G+B) ratio stored by ConjunctivaCaptureScreen
       final ar = conjunctivaData.map((r) => r.redness).reduce((a,b) => a+b)
                  / conjunctivaData.length;
-      final pts = ar < 0.32 ? 35
-                : ar < 0.38 ? 24
-                : ar < 0.43 ? 12
-                : 0;
+      final pts = ar < 0.32 ? 35 : ar < 0.38 ? 24 : ar < 0.43 ? 12 : 0;
       score += pts;
       bd['conjunctiva'] = SignalBreakdown(
-        points: pts, max: 35, icon: '👁️',
+        points: pts, max: 35, icon: 'eye',
         redness: ar,
         label: ar < 0.32 ? 'Severe conjunctival pallor'
              : ar < 0.38 ? 'Moderate conjunctival pallor'
              : ar < 0.43 ? 'Mild conjunctival pallor'
-             : 'Normal conjunctival redness',
-      );
+             : 'Normal conjunctival redness');
     }
 
     // ── 2. Nail beds ──────────────────────────────────────
@@ -151,40 +145,56 @@ class ColorAnalysis {
       final ar = nailData.map((r)=>r.redness).reduce((a,b)=>a+b) / nailData.length;
       final pts = (ap*20 + (1-ar).clamp(0.0,1.0)*10).round().clamp(0,30);
       score += pts;
-      bd['nail'] = SignalBreakdown(points: pts, max: 30, icon: '💅',
+      bd['nail'] = SignalBreakdown(points: pts, max: 30, icon: 'nail',
         pallor: ap, redness: ar,
         label: ap > 0.55 ? 'Pale nail beds' : 'Normal nail bed color');
     }
 
-    // ── 3. SpO₂ ───────────────────────────────────────────
+    // ── 3. Symptom questionnaire ──────────────────────────
+    if (symptomScore != null && symptomMax != null && symptomMax > 0) {
+      // Map 30-pt questionnaire score → 20-pt signal weight
+      const signalMax = 20;
+      maxScore += signalMax;
+      final pts = ((symptomScore / symptomMax) * signalMax).round().clamp(0, signalMax);
+      score += pts;
+      final pct = symptomScore / symptomMax;
+      bd['symptoms'] = SignalBreakdown(
+        points: pts, max: signalMax, icon: 'form',
+        label: pct >= 0.65 ? 'High symptom burden ($symptomScore/$symptomMax)'
+             : pct >= 0.40 ? 'Moderate symptom burden ($symptomScore/$symptomMax)'
+             : pct >= 0.20 ? 'Mild symptom burden ($symptomScore/$symptomMax)'
+             : 'Low symptom burden ($symptomScore/$symptomMax)');
+    }
+
+    // ── 4. SpO₂ ───────────────────────────────────────────
     if (spo2 != null) {
       maxScore += 25;
       final pts = spo2 < 90 ? 25 : spo2 < 94 ? 18 : spo2 < 96 ? 8 : 0;
       score += pts;
-      bd['spo2'] = SignalBreakdown(points: pts, max: 25, icon: '🫁',
+      bd['spo2'] = SignalBreakdown(points: pts, max: 25, icon: 'lung',
         label: spo2 < 90 ? 'Very low SpO₂'
              : spo2 < 94 ? 'Low SpO₂'
              : spo2 < 96 ? 'Borderline SpO₂' : 'Normal SpO₂');
     }
 
-    // ── 4. Palm ───────────────────────────────────────────
+    // ── 5. Palm ───────────────────────────────────────────
     if (palmData != null && palmData.isNotEmpty) {
       maxScore += 25;
       final ap = palmData.map((r)=>r.pallor ).reduce((a,b)=>a+b) / palmData.length;
       final ar = palmData.map((r)=>r.redness).reduce((a,b)=>a+b) / palmData.length;
       final pts = (ap*15 + (1-ar).clamp(0.0,1.0)*10).round().clamp(0,25);
       score += pts;
-      bd['palm'] = SignalBreakdown(points: pts, max: 25, icon: '🤚',
+      bd['palm'] = SignalBreakdown(points: pts, max: 25, icon: 'palm',
         pallor: ap, redness: ar,
         label: ap > 0.55 ? 'Pale palm lines' : 'Normal palm color');
     }
 
-    // ── 5. Heart rate ─────────────────────────────────────
+    // ── 6. Heart rate ─────────────────────────────────────
     if (hr != null) {
       maxScore += 20;
       final pts = hr > 110 ? 20 : hr > 100 ? 13 : hr > 90 ? 5 : 0;
       score += pts;
-      bd['hr'] = SignalBreakdown(points: pts, max: 20, icon: '❤️',
+      bd['hr'] = SignalBreakdown(points: pts, max: 20, icon: 'heart',
         label: hr > 110 ? 'Significant tachycardia'
              : hr > 100 ? 'Mild tachycardia'
              : hr > 90  ? 'High-normal HR' : 'Normal HR');
@@ -216,15 +226,19 @@ class ScanProvider extends ChangeNotifier {
   List<ROIResult>? nailData;
   List<ROIResult>? palmData;
   List<ROIResult>? conjunctivaData;
+  int?             symptomScore;   // raw score from questionnaire
+  int?             symptomMax;     // max (30)
   ScanResult?      result;
 
   WebSocketChannel?   _channel;
   StreamSubscription? _sub;
 
   bool get canAnalyze => hr != null || spo2 != null ||
-      nailData != null || palmData != null || conjunctivaData != null;
-  bool get hrAbnormal   => hr   != null && hr!   > 100;
-  bool get spo2Abnormal => spo2 != null && spo2! < 95;
+      nailData != null || palmData != null ||
+      conjunctivaData != null || symptomScore != null;
+  bool get hrAbnormal      => hr   != null && hr!   > 100;
+  bool get spo2Abnormal    => spo2 != null && spo2! < 95;
+  bool get questionnaireOk => symptomScore != null;
 
   void connectESP32(String ip) {
     esp32IP = ip;
@@ -263,6 +277,11 @@ class ScanProvider extends ChangeNotifier {
   void setNailData(List<ROIResult>? d)         { nailData         = d; notifyListeners(); }
   void setPalmData(List<ROIResult>? d)         { palmData         = d; notifyListeners(); }
   void setConjunctivaData(List<ROIResult>? d)  { conjunctivaData  = d; notifyListeners(); }
+  void setSymptomScore(int score, int max)     {
+    symptomScore = score;
+    symptomMax   = max;
+    notifyListeners();
+  }
 
   void analyze() {
     result = ColorAnalysis.score(
@@ -271,6 +290,8 @@ class ScanProvider extends ChangeNotifier {
       nailData:         nailData,
       palmData:         palmData,
       conjunctivaData:  conjunctivaData,
+      symptomScore:     symptomScore,
+      symptomMax:       symptomMax,
     );
     notifyListeners();
   }
@@ -279,6 +300,8 @@ class ScanProvider extends ChangeNotifier {
     nailData        = null;
     palmData        = null;
     conjunctivaData = null;
+    symptomScore    = null;
+    symptomMax      = null;
     result          = null;
     notifyListeners();
   }
