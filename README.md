@@ -1,68 +1,65 @@
-##Non-Invasive Anemia Screening & Longitudinal Health Monitoring
+# **Anemia Screening & Health Monitoring System**
 
-This project is a clinical-grade Flutter application designed for non-invasive anemia screening using computer vision and IoT sensor data. It utilizes image capture of specific physiological sites (Conjunctiva, Nails, Palm) and sensor-based vitals to provide a comprehensive health assessment.
+This project is a **clinical-grade Flutter application** designed for non-invasive anemia screening. By combining **computer vision** (analyzing physiological sites) with **IoT sensor data**, the system provides a comprehensive, non-invasive health assessment.
 
-🌟 Clinical Screening Methods
-Ocular Conjunctiva Analysis: Captures and analyzes the pallor of the lower eyelid conjunctiva.
+---
 
-Nail Bed & Palm Pallor Detection: Visual assessment of peripheral perfusion and hemoglobin indicators.
+### **🌟 Clinical Screening Methods**
+* **Ocular Conjunctiva Analysis:** Captures and analyzes the pallor of the lower eyelid conjunctiva using specialized image processing.
+* **Nail Bed & Palm Pallor Detection:** Visual assessment of peripheral perfusion and hemoglobin indicators via the `nail_capture` and `palm_capture` modules.
+* **IoT Vital Monitoring:** Real-time **SpO2** and **Heart Rate** data acquisition via **ESP32/Arduino** and the **MAX30102** sensor.
+* **Patient Questionnaire:** Structured data collection to supplement physiological markers for higher diagnostic accuracy.
 
-IoT Vital Monitoring: Real-time SpO2 and Heart Rate data acquisition via ESP32/Arduino and the MAX30102 sensor.
+### **🛠️ Technical Architecture**
+* **Frontend:** Flutter (Mobile & Web)
+* **State Management:** `Provider` / `ScanProvider` for real-time data flow and reactive UI updates.
+* **Backend:** **Firebase** (Authentication & Cloud Firestore) for secure patient records.
+* **Hardware Interface:** Serial communication support for **ESP32/Arduino** integration.
+* **Deployment:** Optimized for high-performance hosting on **Vercel**.
 
-Patient Questionnaire: Structured data collection to supplement physiological markers.
+### **📂 Key Project Modules**
+* `lib/screens/`: Core diagnostic UI, including specialized camera capture screens for conjunctiva, nails, and palms.
+* `lib/services/`: Manages `auth_service.dart` for security and `scan_provider.dart` for image/sensor data processing.
+* `assets/`: Storage for medical reference images, custom icons, and typography.
 
-🛠️ Technical Architecture
-Frontend: Flutter (Mobile & Web)
+---
 
-State Management: Provider / ScanProvider for real-time data flow.
+### **🚀 Getting Started**
 
-Backend: Firebase (Authentication & Cloud Firestore).
+#### **Prerequisites**
+* **Flutter SDK** (Latest Stable)
+* **Node.js** (Required for Vercel CLI deployment)
+* **ESP32/Arduino Hardware** for sensor-based features.
 
-Hardware Interface: Serial communication support for ESP32/Arduino integration.
+#### **Installation**
+1.  **Clone & Install:**
+    ```bash
+    git clone https://github.com/your-username/anemia_app.git
+    cd anemia_app
+    flutter pub get
+    ```
+2.  **Run Locally:**
+    ```bash
+    flutter run
+    ```
 
-Deployment: Optimized for Vercel.
+---
 
-📂 Key Project Modules
-lib/screens/: Contains the core diagnostic UI, including specialized camera capture screens for different body parts.
+### **🌐 Web Deployment (Vercel)**
+To push updates to your live production environment, use the following workflow:
 
-lib/services/: Manages auth_service.dart for secure patient data and scan_provider.dart for processing sensor/image inputs.
+1.  **Generate Release Build:**
+    ```bash
+    flutter build web --release
+    ```
+2.  **Deploy via CLI:**
+    ```bash
+    cd build/web
+    vercel --prod --force
+    ```
 
-assets/: Storage for custom fonts, icons, and medical reference images.
+---
 
-🚀 Getting Started
-Prerequisites
-Flutter SDK (Latest Stable)
+### **📄 Research & Authorship**
+Developed as part of a **Biomedical Engineering** research initiative focusing on affordable, non-invasive diagnostic tools.
 
-Node.js (for Vercel deployment)
-
-ESP32/Arduino hardware for sensor-based features.
-
-Installation
-Clone & Install:
-
-Bash
-git clone https://github.com/your-username/anemia_app.git
-cd anemia_app
-flutter pub get
-Run Locally:
-
-Bash
-flutter run
-🌐 Web Deployment (Vercel)
-To push updates to your live production environment:
-
-Generate Release Build:
-
-Bash
-flutter build web --release
-Deploy via CLI:
-
-Bash
-cd build/web
-vercel --prod --force
-📄 Research & Authorship
-Developed as part of a biomedical engineering research initiative focusing on affordable, non-invasive diagnostic tools.
-
-Lead Developer: Gayathri S. H.
-
-Supervision: Department of Biomedical Engineering, SRM Institute of Science and Technology.
