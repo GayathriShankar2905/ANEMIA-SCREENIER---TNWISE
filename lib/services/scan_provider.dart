@@ -99,7 +99,7 @@ class ColorAnalysis {
   }
 
   // ════════════════════════════════════════════════════════
-  //  SCORING ENGINE  (total 155 pts max)
+  //  SCORING ENGINE  (total 175 pts max)
   //
   //  Signal              Max pts   Notes
   //  ─────────────────────────────────────────────────────
@@ -109,10 +109,12 @@ class ColorAnalysis {
   //  SpO₂                 25 pts   Physiological
   //  Palm                 25 pts   Palmar pallor
   //  Heart rate           20 pts   Compensatory tachycardia
+  //  Perfusion Index      20 pts   Tissue perfusion
   // ════════════════════════════════════════════════════════
   static ScanResult score({
     double? hr,
     double? spo2,
+    double? pi,
     List<ROIResult>? nailData,
     List<ROIResult>? palmData,
     List<ROIResult>? conjunctivaData,
@@ -200,6 +202,17 @@ class ColorAnalysis {
              : hr > 90  ? 'High-normal HR' : 'Normal HR');
     }
 
+    // ── 7. Perfusion Index ────────────────────────────────
+    if (pi != null) {
+      maxScore += 20;
+      final pts = pi < 0.5 ? 20 : pi < 1.0 ? 15 : pi < 2.0 ? 8 : 0;
+      score += pts;
+      bd['pi'] = SignalBreakdown(points: pts, max: 20, icon: 'perfusion',
+        label: pi < 0.5 ? 'Very low perfusion'
+             : pi < 1.0 ? 'Low perfusion'
+             : pi < 2.0 ? 'Borderline perfusion' : 'Normal perfusion');
+    }
+
     final pct = maxScore > 0 ? (score / maxScore) * 100.0 : 0.0;
     final hgb = (16.0 - (pct / 100) * 11).clamp(5.0, 17.0);
 
@@ -215,10 +228,11 @@ class ColorAnalysis {
   }
 }
 
-// ── Updated & Corrected Provider ──────────────────────────────────────
+// ── Provider ──────────────────────────────────────────────
 class ScanProvider extends ChangeNotifier {
   double? hr;
   double? spo2;
+  double? pi;
   bool    sensorLive = false;
   String  wsStatus   = 'disconnected';
   String  esp32IP    = '192.168.1.100';
@@ -226,19 +240,19 @@ class ScanProvider extends ChangeNotifier {
   List<ROIResult>? nailData;
   List<ROIResult>? palmData;
   List<ROIResult>? conjunctivaData;
-  int?             symptomScore;   
-  int?             symptomMax;     
+  int?             symptomScore;   // raw score from questionnaire
+  int?             symptomMax;     // max (30)
   ScanResult?      result;
 
   WebSocketChannel?   _channel;
   StreamSubscription? _sub;
 
-  // Getters for UI logic
-  bool get canAnalyze => hr != null || spo2 != null || 
-      nailData != null || palmData != null || 
+  bool get canAnalyze => hr != null || spo2 != null || pi != null ||
+      nailData != null || palmData != null ||
       conjunctivaData != null || symptomScore != null;
-  bool get hrAbnormal      => hr != null && hr! > 100;
+  bool get hrAbnormal      => hr   != null && hr!   > 100;
   bool get spo2Abnormal    => spo2 != null && spo2! < 95;
+  bool get piAbnormal      => pi   != null && pi!   < 2.0;
   bool get questionnaireOk => symptomScore != null;
 
   void connectESP32(String ip) {
@@ -246,113 +260,70 @@ class ScanProvider extends ChangeNotifier {
     _disconnect();
     wsStatus = 'connecting';
     notifyListeners();
-
     try {
       _channel = WebSocketChannel.connect(Uri.parse('ws://$ip:81'));
-      
+      wsStatus   = 'connected';
+      sensorLive = true;
+      notifyListeners();
       _sub = _channel!.stream.listen(
         (data) {
-          // Confirm connection only when we actually get data
-          if (wsStatus != 'connected') {
-            wsStatus = 'connected';
-            sensorLive = true;
-          }
-          _parseSensorData(data.toString());
+          try {
+            final j = jsonDecode(data as String);
+            if (j['valid'] == 1 || j['valid'] == true) {
+              hr   = (j['hr']   as num?)?.toDouble();
+              spo2 = (j['spo2'] as num?)?.toDouble();
+              pi   = (j['pi']   as num?)?.toDouble();
+              notifyListeners();
+            }
+          } catch (_) {}
         },
-        onError: (err) {
-          print("WS Error: $err");
-          wsStatus = 'error';
-          sensorLive = false;
-          notifyListeners();
-        },
-        onDone: () {
-          wsStatus = 'disconnected';
-          sensorLive = false;
-          notifyListeners();
-        },
+        onError: (_) { wsStatus = 'error';        sensorLive = false; notifyListeners(); },
+        onDone:  ()  { wsStatus = 'disconnected'; sensorLive = false; notifyListeners(); },
       );
-    } catch (e) {
-      wsStatus = 'error';
-      sensorLive = false;
-      notifyListeners();
-    }
-  }
-
-  // Robust parser to handle "garbage" characters and irregular JSON
-  void _parseSensorData(String rawData) {
-    try {
-      // 1. Clean up garbage: find actual JSON start '{' and end '}'
-      int start = rawData.indexOf('{');
-      int end = rawData.lastIndexOf('}');
-      if (start == -1 || end == -1) return;
-
-      String cleanJson = rawData.substring(start, end + 1);
-      final j = jsonDecode(cleanJson);
-
-      // 2. Map JSON values to provider variables if data is valid
-      bool isValid = j['valid'] == 1 || j['valid'] == true;
-      
-      if (isValid) {
-        hr   = (j['hr']   as num).toDouble();
-        spo2 = (j['spo2'] as num).toDouble();
-      } else {
-        // If data is invalid (finger off sensor), we don't update to avoid jumping
-        print("Sensor reading invalid - adjust finger");
-      }
-      
-      // 3. Trigger UI update
-      notifyListeners(); 
-    } catch (e) {
-      print("Parse Error: $e");
-    }
+    } catch (_) { wsStatus = 'error'; sensorLive = false; notifyListeners(); }
   }
 
   void _disconnect() {
-    _sub?.cancel();
-    _channel?.sink.close();
-    _channel = null;
-    _sub = null;
+    _sub?.cancel(); _channel?.sink.close();
+    _channel = null; _sub = null;
   }
 
-  // Setters for manual and image data
-  void setManualHR(double? v)                 { hr = v; notifyListeners(); }
-  void setManualSpo2(double? v)               { spo2 = v; notifyListeners(); }
-  void setNailData(List<ROIResult>? d)        { nailData = d; notifyListeners(); }
-  void setPalmData(List<ROIResult>? d)        { palmData = d; notifyListeners(); }
-  void setConjunctivaData(List<ROIResult>? d) { conjunctivaData = d; notifyListeners(); }
-  void setSymptomScore(int score, int max) {
+  void setManualHR(double? v)                  { hr               = v; notifyListeners(); }
+  void setManualSpo2(double? v)                { spo2             = v; notifyListeners(); }
+  void setManualPI(double? v)                  { pi               = v; notifyListeners(); }
+  void setNailData(List<ROIResult>? d)         { nailData         = d; notifyListeners(); }
+  void setPalmData(List<ROIResult>? d)         { palmData         = d; notifyListeners(); }
+  void setConjunctivaData(List<ROIResult>? d)  { conjunctivaData  = d; notifyListeners(); }
+  void setSymptomScore(int score, int max)     {
     symptomScore = score;
-    symptomMax = max;
+    symptomMax   = max;
     notifyListeners();
   }
 
   void analyze() {
     result = ColorAnalysis.score(
-      hr: hr,
-      spo2: spo2,
-      nailData: nailData,
-      palmData: palmData,
-      conjunctivaData: conjunctivaData,
-      symptomScore: symptomScore,
-      symptomMax: symptomMax,
+      hr:               hr,
+      spo2:             spo2,
+      pi:               pi,
+      nailData:         nailData,
+      palmData:         palmData,
+      conjunctivaData:  conjunctivaData,
+      symptomScore:     symptomScore,
+      symptomMax:       symptomMax,
     );
     notifyListeners();
   }
 
   void reset() {
-    nailData = null;
-    palmData = null;
+    nailData        = null;
+    palmData        = null;
     conjunctivaData = null;
-    symptomScore = null;
-    symptomMax = null;
-    result = null;
+    symptomScore    = null;
+    symptomMax      = null;
+    result          = null;
     notifyListeners();
   }
 
   @override
-  void dispose() {
-    _disconnect();
-    super.dispose();
-  }
+  void dispose() { _disconnect(); super.dispose(); }
 }
-

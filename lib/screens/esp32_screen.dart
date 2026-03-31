@@ -30,6 +30,7 @@ class _ESP32ScreenState extends State<ESP32Screen> with TickerProviderStateMixin
   static const amber  = Color(0xFFFFB547);
   static const red    = Color(0xFFFF4D6A);
   static const blue   = Color(0xFF4D9EFF);
+  static const purp   = Color(0xFFB47FFF);
 
   @override
   void initState() {
@@ -146,6 +147,10 @@ class _ESP32ScreenState extends State<ESP32Screen> with TickerProviderStateMixin
                 scan.spo2 != null ? '${scan.spo2!.toStringAsFixed(0)} %' : '-- %',
                 blue, scan.spo2Abnormal, 'Low')),
             ]),
+            const SizedBox(height: 12),
+            _LiveCard('💉', 'Perfusion Index',
+              scan.pi != null ? '${scan.pi!.toStringAsFixed(2)} %' : '-- %',
+              purp, scan.piAbnormal, 'Low'),
             const SizedBox(height: 18),
           ],
 
@@ -173,6 +178,9 @@ class _ESP32ScreenState extends State<ESP32Screen> with TickerProviderStateMixin
                 Expanded(child: _ManualField('SpO₂', '%',
                   scan.spo2?.toStringAsFixed(0), (v) => scan.setManualSpo2(double.tryParse(v)))),
               ]),
+              const SizedBox(height: 14),
+              _ManualField('Perfusion Index', '%',
+                scan.pi?.toStringAsFixed(2), (v) => scan.setManualPI(double.tryParse(v))),
             ])),
           const SizedBox(height: 18),
 
@@ -187,7 +195,7 @@ class _ESP32ScreenState extends State<ESP32Screen> with TickerProviderStateMixin
               Text('💡  FIRMWARE FORMAT', style: GoogleFonts.dmSans(
                 fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.w700, color: teal)),
               const SizedBox(height: 8),
-              Text('{ "hr": 78, "spo2": 97, "valid": 1 }',
+              Text('{ "hr": 78, "spo2": 97, "pi": 3.2, "valid": 1 }',
                 style: GoogleFonts.sourceCodePro(fontSize: 13, color: text2, height: 1.5)),
               const SizedBox(height: 4),
               Text('Broadcast JSON on WebSocket port 81',
@@ -324,7 +332,7 @@ class _ManualFieldState extends State<_ManualField> {
       child: Row(children: [
         Expanded(child: TextField(
           controller: _ctrl,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onChanged: widget.onChanged,
           style: GoogleFonts.dmSans(fontSize: 20, fontWeight: FontWeight.w800, color: text1),
           decoration: InputDecoration(

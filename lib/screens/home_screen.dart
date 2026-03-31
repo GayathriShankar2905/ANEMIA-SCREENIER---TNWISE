@@ -105,9 +105,11 @@ class _DashPage extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: _Spo2Card(scan: scan)),
         ]),
+        const SizedBox(height: 12),
+        _PiCard(scan: scan),
         const SizedBox(height: 24),
         
-        // REQUESTED CHANGE: Hero Banner
+        // Hero Banner
         _HeroBanner(),
         
         const SizedBox(height: 24),
@@ -199,104 +201,44 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-class _ModuleGrid extends StatelessWidget {
-  final ValueChanged<int> onTab;
-  final BuildContext context;
-  const _ModuleGrid({required this.onTab, required this.context});
-
-  @override
-  Widget build(BuildContext ctx) {
-    final items = [
-      _Mod(Icons.remove_red_eye, 'Conjunctiva', const Color(0xFFB47FFF), 
-        () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const ConjunctivaCaptureScreen()))),
-      _Mod(Icons.back_hand, 'Nail Bed', D.green, 
-        () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const NailCaptureScreen()))),
-      _Mod(Icons.front_hand, 'Palm Color', D.amber, 
-        () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const PalmCaptureScreen()))),
-      _Mod(Icons.settings_input_component, 'Sensor Data', D.teal, 
-        () => onTab(3)),
-      
-      // NEW MODULE ADDED HERE
-      _Mod(Icons.assignment_outlined, 'Questionnaire', D.blue, 
-        () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const QuestionnaireScreen()))),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.6,
-      ),
-      itemBuilder: (context, index) {
-        final m = items[index];
-        return GestureDetector(
-          onTap: m.action,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: D.bg1, 
-              borderRadius: BorderRadius.circular(18), 
-              border: Border.all(color: D.bdr),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(m.icon, color: m.color, size: 24),
-                Text(m.label, 
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13, 
-                    fontWeight: FontWeight.bold, 
-                    color: D.text1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _Mod {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback action;
-  const _Mod(this.icon, this.label, this.color, this.action);
-}
-
-class _SessionStatus extends StatelessWidget {
-  final ScanProvider scan;
-  const _SessionStatus({required this.scan});
-
+class _Avatar extends StatelessWidget {
+  final User? user;
+  const _Avatar({required this.user});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: D.bg1, borderRadius: BorderRadius.circular(20), border: Border.all(color: D.bdr)),
-      child: Column(children: [
-        _row(Icons.wifi, 'Hardware Link', scan.wsStatus == 'connected' ? 'Connected' : 'Disconnected', scan.wsStatus == 'connected' ? D.green : D.text3),
-        const Divider(color: D.bdr, height: 24),
-        _row(Icons.remove_red_eye_outlined, 'Palpebral Conjunctiva Pallor Analysis',
-          scan.conjunctivaData != null ? 'Captured' : 'Pending',
-          scan.conjunctivaData != null ? D.green : D.text3),
-        const Divider(color: D.bdr, height: 24),
-        _row(Icons.cloud_done, 'Database', 'Cloud Ready', D.blue),
-      ]));
+    final url = user?.photoURL;
+    return GestureDetector(
+      onTap: () => _showMenu(context),
+      child: Container(
+        width: 48, height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: D.teal.withOpacity(0.35), width: 2),
+          boxShadow: [BoxShadow(color: D.teal.withOpacity(0.18), blurRadius: 14)]),
+        child: url != null
+          ? ClipOval(child: Image.network(url, fit: BoxFit.cover))
+          : Container(
+              color: D.bg3,
+              child: Icon(Icons.person_outline, size: 24, color: D.text2))));
   }
 
-  Widget _row(IconData ic, String label, String status, Color c) => Row(children: [
-    Icon(ic, size: 18, color: D.text2),
-    const SizedBox(width: 12),
-    Expanded(child: Text(label, style: GoogleFonts.dmSans(fontSize: 13, color: D.text2))),
-    Text(status, style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w800, color: c)),
-  ]);
+  void _showMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: D.bg1,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.logout, color: D.red),
+            title: Text('Sign out', style: GoogleFonts.dmSans(color: D.text1, fontWeight: FontWeight.w600)),
+            onTap: () async {
+              await context.read<AuthService>().signOut();
+              if (ctx.mounted) Navigator.pop(ctx);
+            }),
+        ])));
+  }
 }
 
 class _HrCard extends StatelessWidget {
@@ -305,17 +247,40 @@ class _HrCard extends StatelessWidget {
   const _HrCard({required this.ecgCtrl, required this.dotCtrl, required this.scan});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: D.bg1, borderRadius: BorderRadius.circular(20), border: Border.all(color: D.bdr)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('HEART RATE', style: GoogleFonts.dmSans(fontSize: 10, fontWeight: FontWeight.w700, color: D.text2)),
-        AnimatedBuilder(animation: dotCtrl, builder: (_, __) => Icon(Icons.favorite, size: 14, color: scan.sensorLive ? D.red.withOpacity(dotCtrl.value) : D.text3)),
-      ]),
-      const SizedBox(height: 8),
-      Text(scan.hr != null ? '${scan.hr!.toInt()} BPM' : '--', style: GoogleFonts.dmSans(fontSize: 22, fontWeight: FontWeight.w900, color: D.text1)),
-    ]));
+  Widget build(BuildContext context) {
+    final hr = scan.hr;
+    final live = scan.sensorLive;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: D.bg1, borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: D.bdr),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 14, offset: const Offset(0,4))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: D.red.withOpacity(0.10), borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: D.red.withOpacity(0.22))),
+            child: const Icon(Icons.favorite, size: 16, color: D.red)),
+          const Spacer(),
+          if (live) AnimatedBuilder(
+            animation: dotCtrl,
+            builder: (_, __) => Container(width: 8, height: 8,
+              decoration: BoxDecoration(
+                color: D.green.withOpacity(dotCtrl.value),
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: D.green.withOpacity(dotCtrl.value * 0.8), blurRadius: 8)]))),
+        ]),
+        const SizedBox(height: 12),
+        Text('Heart Rate', style: GoogleFonts.dmSans(fontSize: 11, color: D.text2)),
+        const SizedBox(height: 4),
+        Text(hr != null ? '${hr.toStringAsFixed(0)} bpm' : '-- bpm',
+          style: GoogleFonts.dmSans(fontSize: 26, fontWeight: FontWeight.w900, color: D.text1)),
+        const SizedBox(height: 8),
+        SizedBox(height: 36, child: CustomPaint(painter: _EcgPainter(ecgCtrl))),
+      ]));
+  }
 }
 
 class _Spo2Card extends StatelessWidget {
@@ -323,206 +288,303 @@ class _Spo2Card extends StatelessWidget {
   const _Spo2Card({required this.scan});
 
   @override
+  Widget build(BuildContext context) {
+    final spo2 = scan.spo2;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: D.bg1, borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: D.bdr),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 14, offset: const Offset(0,4))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: D.blue.withOpacity(0.10), borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: D.blue.withOpacity(0.22))),
+          child: const Icon(Icons.air, size: 16, color: D.blue)),
+        const SizedBox(height: 12),
+        Text('SpO₂', style: GoogleFonts.dmSans(fontSize: 11, color: D.text2)),
+        const SizedBox(height: 4),
+        Text(spo2 != null ? '${spo2.toStringAsFixed(0)} %' : '-- %',
+          style: GoogleFonts.dmSans(fontSize: 26, fontWeight: FontWeight.w900, color: D.text1)),
+        const SizedBox(height: 10),
+        if (spo2 != null) LinearProgressIndicator(
+          value: spo2 / 100,
+          backgroundColor: D.bg3,
+          valueColor: AlwaysStoppedAnimation(spo2 < 95 ? D.red : D.blue),
+          minHeight: 6, borderRadius: BorderRadius.circular(3)),
+      ]));
+  }
+}
+
+class _PiCard extends StatelessWidget {
+  final ScanProvider scan;
+  const _PiCard({required this.scan});
+
+  @override
+  Widget build(BuildContext context) {
+    final pi = scan.pi;
+    final live = scan.sensorLive;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: D.bg1, borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: D.bdr),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 14, offset: const Offset(0,4))]),
+      child: Row(children: [
+        Container(width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: D.purp.withOpacity(0.10), borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: D.purp.withOpacity(0.22))),
+          child: const Icon(Icons.waves, size: 20, color: D.purp)),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Perfusion Index', style: GoogleFonts.dmSans(fontSize: 11, color: D.text2)),
+          const SizedBox(height: 2),
+          Text(pi != null ? '${pi.toStringAsFixed(2)} %' : '-- %',
+            style: GoogleFonts.dmSans(fontSize: 22, fontWeight: FontWeight.w900, color: D.text1)),
+        ])),
+        if (live && pi != null && pi < 2.0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: D.amber.withOpacity(0.10), borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: D.amber.withOpacity(0.28))),
+            child: Text('Low', style: GoogleFonts.dmSans(
+              fontSize: 10, fontWeight: FontWeight.w800, color: D.amber))),
+      ]));
+  }
+}
+
+class _EcgPainter extends CustomPainter {
+  final AnimationController ctrl;
+  const _EcgPainter(this.ctrl) : super(repaint: ctrl);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = D.red..strokeWidth = 2.5..style = PaintingStyle.stroke;
+    final path = Path();
+    final t = ctrl.value;
+    for (int i = 0; i < size.width.toInt(); i++) {
+      final x = i.toDouble();
+      final phase = (x / size.width - t) * 2 * math.pi * 1.8;
+      double y = size.height / 2;
+      if (phase > -0.3 && phase < 0.1) {
+        y += size.height * 0.35 * math.sin(phase * 14);
+      } else if (phase > 0.15 && phase < 0.35) {
+        y -= size.height * 0.2 * math.sin((phase - 0.15) * 15);
+      }
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+    }
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(_EcgPainter old) => false;
+}
+
+Widget _SectionLabel(String t) => Text(t, style: GoogleFonts.dmSans(
+  fontSize: 11, fontWeight: FontWeight.w800, color: D.teal, letterSpacing: 1.5));
+
+class _ModuleGrid extends StatelessWidget {
+  final ValueChanged<int> onTab;
+  final BuildContext context;
+  const _ModuleGrid({required this.onTab, required this.context});
+
+  @override
+  Widget build(BuildContext context) => GridView.count(
+    crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+    mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.1,
+    children: [
+      _ModuleTile('Nail Beds', Icons.bloodtype, D.red,
+        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NailCaptureScreen()))),
+      _ModuleTile('Palm Lines', Icons.pan_tool_outlined, D.amber,
+        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PalmCaptureScreen()))),
+      _ModuleTile('Conjunctiva', Icons.visibility_outlined, D.blue,
+        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConjunctivaCaptureScreen()))),
+      _ModuleTile('Symptoms', Icons.assignment_outlined, D.purp,
+        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionnaireScreen()))),
+    ]);
+}
+
+class _ModuleTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _ModuleTile(this.label, this.icon, this.color, this.onTap);
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(
+        color: D.bg1, borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: D.bdr),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, offset: const Offset(0,4))]),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(width: 56, height: 56,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.22))),
+          child: Icon(icon, color: color, size: 26)),
+        const SizedBox(height: 12),
+        Text(label, style: GoogleFonts.dmSans(
+          fontSize: 13, fontWeight: FontWeight.w800, color: D.text1)),
+      ])));
+}
+
+class _SessionStatus extends StatelessWidget {
+  final ScanProvider scan;
+  const _SessionStatus({required this.scan});
+
+  @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: D.bg1, borderRadius: BorderRadius.circular(20), border: Border.all(color: D.bdr)),
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: D.bg1, borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: D.bdr),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12)]),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('SPO2 LEVEL', style: GoogleFonts.dmSans(fontSize: 10, fontWeight: FontWeight.w700, color: D.text2)),
-      const SizedBox(height: 8),
-      Text(scan.spo2 != null ? '${scan.spo2!.toInt()}%' : '--', style: GoogleFonts.dmSans(fontSize: 22, fontWeight: FontWeight.w900, color: D.text1)),
+      _StatusRow('Nail bed analysis', scan.nailData != null),
+      const SizedBox(height: 10),
+      _StatusRow('Palm analysis', scan.palmData != null),
+      const SizedBox(height: 10),
+      _StatusRow('Conjunctiva analysis', scan.conjunctivaData != null),
+      const SizedBox(height: 10),
+      _StatusRow('Symptom questionnaire', scan.symptomScore != null),
+      const SizedBox(height: 10),
+      _StatusRow('Heart rate data', scan.hr != null),
+      const SizedBox(height: 10),
+      _StatusRow('SpO₂ data', scan.spo2 != null),
+      const SizedBox(height: 10),
+      _StatusRow('Perfusion index data', scan.pi != null),
     ]));
 }
 
-class _Avatar extends StatelessWidget {
-  final User? user;
-  const _Avatar({required this.user});
+Widget _StatusRow(String label, bool done) => Row(children: [
+  Icon(done ? Icons.check_circle : Icons.radio_button_unchecked,
+    size: 18, color: done ? D.green : D.text3),
+  const SizedBox(width: 10),
+  Text(label, style: GoogleFonts.dmSans(fontSize: 12, color: done ? D.text1 : D.text2)),
+]);
+
+class _EmptyReports extends StatelessWidget {
+  final VoidCallback onScan;
+  const _EmptyReports({required this.onScan});
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: 44, height: 44,
-    decoration: BoxDecoration(color: D.bg3, borderRadius: BorderRadius.circular(12), border: Border.all(color: D.teal.withOpacity(0.3))),
-    child: const Icon(Icons.person, color: D.teal, size: 20),
-  );
+  Widget build(BuildContext context) => Center(
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.description_outlined, size: 72, color: D.text3),
+      const SizedBox(height: 16),
+      Text('No reports yet', style: GoogleFonts.dmSans(
+        fontSize: 18, fontWeight: FontWeight.w700, color: D.text2)),
+      const SizedBox(height: 8),
+      Text('Complete a scan to generate a report',
+        style: GoogleFonts.dmSans(fontSize: 13, color: D.text3)),
+      const SizedBox(height: 24),
+      GestureDetector(
+        onTap: onScan,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [D.teal, D.tealDk]),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: D.teal.withOpacity(0.4), blurRadius: 16, offset: const Offset(0,6))]),
+          child: Text('Start New Scan', style: GoogleFonts.dmSans(
+            fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)))),
+    ]));
 }
 
 class _NavBar extends StatelessWidget {
   final int tab;
   final ValueChanged<int> onTap;
   const _NavBar({required this.tab, required this.onTap});
+
   @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: tab, onTap: onTap,
-      backgroundColor: D.bg1, selectedItemColor: D.teal, unselectedItemColor: D.text3,
-      type: BottomNavigationBarType.fixed,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.camera_rounded), label: 'Scan'),
-        BottomNavigationBarItem(icon: Icon(Icons.assignment_rounded), label: 'Reports'),
-        BottomNavigationBarItem(icon: Icon(Icons.sensors_rounded), label: 'Sensor'),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    height: 70,
+    decoration: BoxDecoration(
+      color: D.bg1,
+      border: Border(top: BorderSide(color: D.bdr)),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0,-2))]),
+    child: Row(children: [
+      _NavItem(0, tab, Icons.dashboard_outlined, 'Dashboard', onTap),
+      _NavItem(1, tab, Icons.qr_code_scanner, 'Scan', onTap),
+      _NavItem(2, tab, Icons.description_outlined, 'Reports', onTap),
+      _NavItem(3, tab, Icons.settings_input_antenna, 'Sensor', onTap),
+    ]));
+
+  static Widget _NavItem(int i, int curr, IconData icon, String label, ValueChanged<int> cb) =>
+    Expanded(child: GestureDetector(
+      onTap: () => cb(i),
+      child: Container(
+        color: Colors.transparent,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 24, color: curr == i ? D.teal : D.text3),
+          const SizedBox(height: 4),
+          Text(label, style: GoogleFonts.dmSans(
+            fontSize: 10, fontWeight: FontWeight.w600,
+            color: curr == i ? D.teal : D.text3)),
+        ]))));
 }
 
-class _EmptyReports extends StatelessWidget {
-  final VoidCallback onScan;
-  const _EmptyReports({required this.onScan});
-  @override
-  Widget build(BuildContext context) => Center(child: Text('No Reports Yet', style: TextStyle(color: D.text2)));
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  SCAN PAGE
-// ══════════════════════════════════════════════════════════════════
 class _ScanPage extends StatelessWidget {
-  final ValueChanged<int>? onTab;
+  final ValueChanged<int> onTab;
   const _ScanPage({required this.onTab});
 
   @override
   Widget build(BuildContext context) {
     final scan = context.watch<ScanProvider>();
     return SafeArea(child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('New Scan', style: GoogleFonts.playfairDisplay(
+        Text('CLINICAL PROTOCOL', style: GoogleFonts.dmSans(
+          fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w700, color: D.teal)),
+        Text('Multi-Signal Anemia Assessment', style: GoogleFonts.playfairDisplay(
           fontSize: 24, fontWeight: FontWeight.w900, color: D.text1)),
-        const SizedBox(height: 4),
-        Text('Complete all modules for maximum diagnostic accuracy.',
-          style: GoogleFonts.dmSans(fontSize: 12, color: D.text2)),
         const SizedBox(height: 24),
 
-        _StepCard(
-          num: '01',
-          title: 'Hardware System',
-          subtitle: 'Connect ESP32 + MAX30105 optical sensor for live heart rate and arterial oxygen saturation.',
-          icon: Icons.settings_input_component_outlined,
-          color: D.teal,
-          done: scan.sensorLive,
-          onTap: () => onTab?.call(3),
-          trailing: scan.hr != null ? Row(children: [
-            _Tag('HR  ${scan.hr!.toInt()} BPM', D.red),
-            const SizedBox(width: 8),
-            _Tag('SpO₂  ${scan.spo2?.toInt() ?? '--'} %', D.blue),
-          ]) : null),
-        const SizedBox(height: 12),
-
-        _StepCard(
-          num: '02',
-          title: 'Palpebral Conjunctiva Pallor Analysis',
-          subtitle: 'Photograph the inner lower eyelid. Redness ratio is the most clinically reliable non-invasive anemia indicator.',
-          icon: Icons.remove_red_eye_outlined,
-          color: D.purp,
-          done: scan.conjunctivaData != null,
-          badge: 'HIGHEST ACCURACY · 35 pts',
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => const ConjunctivaCaptureScreen())),
-          trailing: scan.conjunctivaData != null
-            ? _ConjunctivaInline(scan.conjunctivaData!) : null),
-        const SizedBox(height: 12),
-
-        _StepCard(
-          num: '03',
-          title: 'Nail Bed Pallor Detection',
-          subtitle: 'Position ROI markers on each fingernail bed to extract mean chrominance for pallor index scoring.',
-          icon: Icons.back_hand_outlined,
-          color: D.green,
-          done: scan.nailData != null,
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => const NailCaptureScreen())),
+        _StepCard(num: '1', title: 'Nail bed chrominance', subtitle: 'Capture nail bed images for pallor analysis',
+          icon: Icons.bloodtype, color: D.red, done: scan.nailData != null,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NailCaptureScreen())),
           trailing: scan.nailData != null ? _RoiColorRow(scan.nailData!, 4) : null),
         const SizedBox(height: 12),
 
-        _StepCard(
-          num: '04',
-          title: 'Palmar Pallor Analysis',
-          subtitle: 'Sample thenar and hypothenar eminence regions for palmar crease redness ratio analysis.',
-          icon: Icons.front_hand_outlined,
-          color: D.amber,
-          done: scan.palmData != null,
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => const PalmCaptureScreen())),
-          trailing: scan.palmData != null ? _RoiColorRow(scan.palmData!, 3) : null),
+        _StepCard(num: '2', title: 'Palm crease assessment', subtitle: 'Evaluate palmar pallor via crease analysis',
+          icon: Icons.pan_tool_outlined, color: D.amber, done: scan.palmData != null,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PalmCaptureScreen())),
+          trailing: scan.palmData != null ? _RoiColorRow(scan.palmData!, 4) : null),
         const SizedBox(height: 12),
 
-        // Inside _ScanPage Column...
+        _StepCard(num: '3', title: 'Conjunctival redness', subtitle: 'Measure lower palpebral conjunctival redness index',
+          icon: Icons.visibility_outlined, color: D.blue, done: scan.conjunctivaData != null,
+          badge: 'SHETH et al. 2016',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConjunctivaCaptureScreen())),
+          trailing: scan.conjunctivaData != null ? _ConjunctivaInline(scan.conjunctivaData!) : null),
+        const SizedBox(height: 12),
 
-_StepCard(
-  num: '05',
-  title: 'Clinical Symptom Questionnaire',
-  subtitle: '10 validated questions covering fatigue, dyspnoea, pallor, palpitations, and dietary risk factors.',
-  icon: Icons.assignment_outlined,
-  color: D.blue,
-  done: scan.questionnaireOk, // This checks if the scan is completed
-  badge: '20 pts · Self-reported',
-  onTap: () {
-    // Debug print to ensure the tap is registered
-    print("Navigating to Questionnaire..."); 
-    Navigator.push(
-      context, 
-      MaterialPageRoute(builder: (_) => const QuestionnaireScreen())
-    );
-  },
-  trailing: scan.questionnaireOk
-    ? _SymptomScoreTag(scan.symptomScore!, scan.symptomMax!)
-    : null,
-),
+        _StepCard(num: '4', title: 'Symptom questionnaire', subtitle: 'Complete 10-question clinical symptom screen',
+          icon: Icons.assignment_outlined, color: D.purp, done: scan.questionnaireOk,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionnaireScreen())),
+          trailing: scan.symptomScore != null && scan.symptomMax != null
+            ? _SymptomScoreTag(scan.symptomScore!, scan.symptomMax!) : null),
+        const SizedBox(height: 12),
 
-const SizedBox(height: 32),
+        _StepCard(num: '5', title: 'Physiological signals', subtitle: 'Connect ESP32 sensor for HR, SpO₂, and PI',
+          icon: Icons.settings_input_antenna, color: D.teal, 
+          done: scan.hr != null && scan.spo2 != null && scan.pi != null,
+          badge: 'MAX30105 SENSOR',
+          onTap: () => onTab(3)),
+        const SizedBox(height: 28),
 
-// 2. The Final Analysis Button (The "Submit" Button)
-// This button only becomes "Accessible" once the modules are done.
-GestureDetector(
-  onTap: scan.canAnalyze 
-    ? () { 
-        scan.analyze(); 
-        onTab?.call(2); // Moves to the Reports Tab
-      } 
-    : () {
-        // Optional: Show a snackbar if they try to click it while disabled
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please complete the Questionnaire to finish.'))
-        );
-      },
-  child: AnimatedContainer(
-    duration: const Duration(milliseconds: 220),
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(vertical: 18),
-    decoration: BoxDecoration(
-      gradient: scan.canAnalyze
-        ? const LinearGradient(colors: [D.teal, D.tealDk]) 
-        : null,
-      color: scan.canAnalyze ? null : D.bg2,
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: scan.canAnalyze
-        ? [BoxShadow(color: D.teal.withOpacity(0.40), blurRadius: 24, offset: const Offset(0, 8))] 
-        : [],
-    ),
-    child: Center(
-      child: Text(
-        scan.canAnalyze
-          ? 'Compute Anemia Risk Score'
-          : 'Complete Questionnaire to Analyze',
-        style: GoogleFonts.dmSans(
-          fontSize: 14, 
-          fontWeight: FontWeight.w800,
-          color: scan.canAnalyze ? Colors.white : D.text3,
-          letterSpacing: 0.2,
-        ),
-      ),
-    ),
-  ),
-),
-
-        // Analyze CTA
         GestureDetector(
-          onTap: scan.canAnalyze ? () { scan.analyze(); onTab?.call(2); } : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 18),
+          onTap: scan.canAnalyze ? () { scan.analyze(); onTab(2); } : null,
+          child: Container(
+            width: double.infinity, height: 62,
             decoration: BoxDecoration(
-              gradient: scan.canAnalyze
-                ? LinearGradient(colors: [D.teal, D.tealDk]) : null,
+              gradient: scan.canAnalyze ? const LinearGradient(colors: [D.teal, D.tealDk]) : null,
               color: scan.canAnalyze ? null : D.bg2,
               borderRadius: BorderRadius.circular(18),
               boxShadow: scan.canAnalyze
@@ -702,13 +764,3 @@ class _SymptomScoreTag extends StatelessWidget {
     ]);
   }
 }
-
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-  const _PlaceholderPage(this.title);
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Text(title, style: TextStyle(color: D.text2)));
-}
-
-Widget _SectionLabel(String t) => Text(t, style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w800, color: D.teal, letterSpacing: 1.5));
